@@ -1,0 +1,20 @@
+"scpsite"
+{
+	"base"			"sandbox"
+	"title"			"SCP — Объект 19"
+	"maps"			"^scp_|^gm_site|^rp_site|^rp_scp"
+	"category"		"other"
+	"menusystem"	"1"
+
+	"settings"
+	{
+		1
+		{
+			"name"		"scp_solo_kick"
+			"text"		"Одиночная игра кикает остальных"
+			"help"		"1 — при выборе одиночной игры остальные игроки отключаются с сервера"
+			"type"		"CheckBox"
+			"default"	"1"
+		}
+	}
+}
