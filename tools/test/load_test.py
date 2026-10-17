@@ -76,6 +76,7 @@ hook = {
 	Remove = function() end,
 	Run = function() end,
 	Call = function() end,
+	GetTable = function() return {} end,
 }
 NETS = {}
 net = setmetatable({ Receive = function(name, fn) NETS[name] = fn end }, { __index = function() return STUB end })

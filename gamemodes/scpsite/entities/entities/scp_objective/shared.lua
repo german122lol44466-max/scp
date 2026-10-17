@@ -10,4 +10,5 @@ function ENT:SetupDataTables()
 	self:NetworkVar("Float", 0, "Progress")
 	self:NetworkVar("Float", 1, "Duration")
 	self:NetworkVar("Bool", 0, "Done")
+	self:NetworkVar("Bool", 1, "Blocked")
 end

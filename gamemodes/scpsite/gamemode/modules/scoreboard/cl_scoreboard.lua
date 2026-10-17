@@ -13,8 +13,23 @@ local statusOf = {
 	edit = { "РЕДАКТОР", Color(110, 160, 220) },
 }
 
+local function volumeModal(p)
+	local bg, body = SCP.Modal("Громкость: " .. p:SCPName(), 460, 220, "volume")
+	local sl = vgui.Create("SCP.Slider", body)
+	sl:Dock(TOP)
+	sl:Setup("Громкость голоса игрока", 0, 2, 2, function() return SCP.Settings.PlayerVolume(p) end,
+		function(v) SCP.Settings.SetPlayerVolume(p, v) end, function(v) return math.Round(v * 100) .. "%" end)
+	local mute = vgui.Create("SCP.Toggle", body)
+	mute:Dock(TOP)
+	mute:DockMargin(0, UI.S(12), 0, 0)
+	mute:Setup("Заглушить полностью", function() return p:IsMuted() end, function(v) p:SetMuted(v) end)
+end
+
 local function rowMenu(p)
 	local m = DermaMenu()
+	if p ~= LocalPlayer() then
+		m:AddOption("Громкость голоса…", function() volumeModal(p) end):SetIcon("icon16/sound.png")
+	end
 	m:AddOption(p:IsMuted() and "Включить голос" or "Заглушить голос", function() p:SetMuted(not p:IsMuted()) end):SetIcon("icon16/sound_mute.png")
 	m:AddOption("Профиль Steam", function() p:ShowProfile() end):SetIcon("icon16/user.png")
 	m:AddOption("Скопировать SteamID", function() SetClipboardText(p:SteamID()) end):SetIcon("icon16/page_copy.png")
@@ -84,7 +99,7 @@ function SB.Open()
 		row.Born = RealTime() + i * 0.03
 		row.hover = 0
 		row.DoRightClick = function() if IsValid(p) then rowMenu(p) end end
-		row.DoClick = row.DoRightClick
+		row.DoClick = function() if IsValid(p) and p ~= LocalPlayer() then volumeModal(p) end end
 		row.Paint = function(s, rw, rh)
 			if not IsValid(p) then return true end
 			s.hover = UI.Approach(s.hover, s:IsHovered() and 1 or 0, 12)
@@ -99,7 +114,8 @@ function SB.Open()
 			surface.SetDrawColor(scol)
 			surface.DrawRect(0, 0, UI.S(2), rh)
 			draw.SimpleText(p:SCPName(), SCP.Font("semibold", 17), UI.S(62), UI.S(19), UI.Col.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-			local sub = p:Nick()
+			local _, idx, fac = SCP.Lobby.ModelOf(p)
+			local sub = p:Nick() .. " · " .. fac.short
 			if p:IsSuperAdmin() then sub = sub .. " · администратор" end
 			draw.SimpleText(sub, SCP.Font("mono", 11), UI.S(62), UI.S(38), UI.Col.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 			if p:IsSpeaking() then UI.DrawIcon("mic", UI.S(62) + UI.TextSize(p:SCPName(), SCP.Font("semibold", 17)) + UI.S(14), UI.S(19), UI.S(14), UI.Col.green) end

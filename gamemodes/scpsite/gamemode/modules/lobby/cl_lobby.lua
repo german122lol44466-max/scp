@@ -8,7 +8,7 @@ local L = SCP.Lobby
 net.Receive("scp.lobby.sync", function()
 	local id = net.ReadUInt(16)
 	if id == 0 then L.Mine = nil return end
-	local lobby = { id = id, leader = net.ReadEntity(), started = net.ReadBool(), members = {} }
+	local lobby = { id = id, leader = net.ReadEntity(), started = net.ReadBool(), chapter = net.ReadUInt(4), members = {} }
 	for _ = 1, net.ReadUInt(5) do lobby.members[#lobby.members + 1] = net.ReadEntity() end
 	L.Mine = lobby
 end)

@@ -75,34 +75,20 @@ local function openInvite()
 		end
 	end
 	search.OnChange = fill
+	search:SetUpdateOnType(true)
+	search.OnValueChange = fill
+	timer.Simple(0, function() if IsValid(search) then search:RequestFocus() end end)
 	fill()
 end
 
 -- ------------------------------------------------------------ смена имени --
-local function editName(parent, x, y, w)
-	local e = vgui.Create("SCP.Entry", parent)
-	e:SetSize(w, UI.S(46))
-	e:SetPos(x - w / 2, y - UI.S(23))
-	e:SetFont(SCP.Font("title", 28))
-	e:SetValue(LocalPlayer():SCPName())
-	parent:SetKeyboardInputEnabled(true)
-	e:RequestFocus()
-	e:SelectAllText()
-	local function done(save)
-		if not IsValid(e) then return end
-		if save then
-			net.Start("scp.lobby.name")
-			net.WriteString(e:GetValue())
-			net.SendToServer()
-			UI.Sound("success")
-		end
-		e:Remove()
-		if IsValid(parent) then parent:SetKeyboardInputEnabled(false) end
-	end
-	e.OnEnter = function() done(true) end
-	e.OnLoseFocus = function() done(true) end
-	e.OnKeyCodeTyped = function(s, key) if key == KEY_ESCAPE then done(false) end end
-	return e
+local function editName()
+	SCP.Prompt("Имя оперативника", "Как вас будут видеть другие игроки (2–24 символа)", LocalPlayer():SCPName(), function(v)
+		net.Start("scp.lobby.name")
+		net.WriteString(v)
+		net.SendToServer()
+		UI.Sound("success")
+	end, 24)
 end
 
 -- ------------------------------------------------------------- участник --
@@ -120,8 +106,8 @@ local function memberRow(parent, p)
 		surface.SetDrawColor(110, 196, 120, 255 * s.talk)
 		surface.DrawRect(0, 0, UI.S(3), h)
 		draw.SimpleText(p:SCPName(), SCP.Font("semibold", 16), UI.S(68), UI.S(21), UI.Col.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-		local _, idx = L.ModelOf(p)
-		draw.SimpleText(C.ModelNames[idx] or "", SCP.Font("mono", 12), UI.S(68), UI.S(42), UI.Col.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		local _, idx, fac = L.ModelOf(p)
+		draw.SimpleText(string.upper(fac.short) .. " · " .. (fac.modelNames[idx] or ""), SCP.Font("mono", 12), UI.S(68), UI.S(42), UI.Col.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		local x = w - UI.S(16)
 		if L.Mine and L.Mine.leader == p then
 			draw.SimpleText("ЛИДЕР", SCP.Font("monobold", 11), x, h / 2, UI.Col.amber, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
@@ -180,7 +166,7 @@ function M.BuildLobby()
 	local mw, mh = UI.S(560), UI.S(760)
 	local mdl = vgui.Create("DModelPanel", root)
 	mdl:SetSize(mw, mh)
-	mdl:SetPos(W / 2 - mw / 2 - UI.S(120), H / 2 - mh / 2 + UI.S(30))
+	mdl:SetPos(W / 2 - mw / 2 - UI.S(40), H / 2 - mh / 2 + UI.S(30))
 	mdl:SetFOV(26)
 	mdl:SetAmbientLight(Color(60, 60, 70))
 	mdl:SetDirectionalLight(BOX_TOP, Color(255, 250, 240))
@@ -245,15 +231,15 @@ function M.BuildLobby()
 		draw.SimpleText("НАЖМИТЕ, ЧТОБЫ СМЕНИТЬ ИМЯ", SCP.Font("mono", 10), w / 2, h - UI.S(4), UI.Alpha(UI.Col.dim, 120 * s.hover), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
 		return true
 	end
-	nameBtn.DoClick = function(s)
+	nameBtn.DoClick = function()
 		UI.Sound("click")
-		editName(root, s:GetX() + s:GetWide() / 2, s:GetY() + s:GetTall() / 2 - UI.S(6), UI.S(420))
+		editName()
 	end
 
 	-- стрелки выбора модели
 	local function pick(dir)
-		local _, i = L.ModelOf(LocalPlayer())
-		i = (i - 1 + dir) % #C.Models + 1
+		local _, i, fac = L.ModelOf(LocalPlayer())
+		i = (i - 1 + dir) % #fac.models + 1
 		net.Start("scp.lobby.model")
 		net.WriteUInt(i, 4)
 		net.SendToServer()
@@ -272,9 +258,10 @@ function M.BuildLobby()
 	cap:SetSize(mw, UI.S(50))
 	cap:SetPos(mdl:GetX(), mdl:GetY() + mh - UI.S(10))
 	cap.Paint = function(_, w, h)
-		local _, i = L.ModelOf(LocalPlayer())
-		draw.SimpleText(C.ModelNames[i] or "", SCP.Font("titlemed", 20), w / 2, UI.S(12), UI.Col.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		local n = #C.Models
+		local _, i, fac = L.ModelOf(LocalPlayer())
+		draw.SimpleText(fac.modelNames[i] or "", SCP.Font("titlemed", 20), w / 2, UI.S(12), UI.Col.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText(string.upper(fac.name), SCP.Font("mono", 10), w / 2, UI.S(52), fac.color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		local n = #fac.models
 		for k = 1, n do
 			local x = w / 2 + (k - (n + 1) / 2) * UI.S(18)
 			surface.SetDrawColor(255, 255, 255, k == i and 230 or 50)
@@ -324,6 +311,15 @@ function M.BuildLobby()
 		end
 	end
 
+	-- главы слева
+	M.ChapterList(root, UI.S(48), H / 2 - UI.S(250), UI.S(330), function() return L.Mine and L.Mine.chapter or 1 end,
+		function(i)
+			if not L.IsLeader() then SCP.Notify("Главу выбирает лидер отряда.", "info") return end
+			net.Start("scp.lobby.chapter")
+			net.WriteUInt(i, 4)
+			net.SendToServer()
+		end)
+
 	-- играть
 	local play = vgui.Create("SCP.Button", root)
 	play:SetSize(UI.S(380), UI.S(64))
@@ -353,4 +349,53 @@ function M.BuildLobby()
 		net.SendToServer()
 	end
 	return root
+end
+
+-- Список глав (лобби и одиночная игра): get() — выбранная, set(i) — выбрать
+function M.ChapterList(parent, x, y, w, get, set)
+	local S = SCP.Story
+	local list = vgui.Create("DPanel", parent)
+	list:SetPos(x, y)
+	list:SetSize(w, UI.S(40) + #S.Chapters * UI.S(92))
+	list.Paint = function(_, pw)
+		draw.SimpleText("КАМПАНИЯ", SCP.Font("monobold", 12), 0, UI.S(14), UI.Col.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		surface.SetDrawColor(UI.Col.red)
+		surface.DrawRect(0, UI.S(28), UI.S(20), 1)
+	end
+	for i, ch in ipairs(S.Chapters) do
+		local b = vgui.Create("DButton", list)
+		b:SetText("")
+		b:SetPos(0, UI.S(40) + (i - 1) * UI.S(92))
+		b:SetSize(w, UI.S(84))
+		b.hover = 0
+		b.sel = 0
+		b.OnCursorEntered = function() UI.Sound("hover") end
+		b.DoClick = function() UI.Sound("click") set(i) end
+		b.Paint = function(s, bw, bh)
+			local on = get() == i
+			s.hover = UI.Approach(s.hover, s:IsHovered() and 1 or 0, 12)
+			s.sel = UI.Approach(s.sel, on and 1 or 0, 10)
+			local fac = SCP.Config.Factions[ch.faction]
+			surface.SetMaterial(UI.Mat("scpsite/updates/" .. ch.image .. ".png"))
+			surface.SetDrawColor(255, 255, 255, 40 + 90 * s.sel + 30 * s.hover)
+			surface.DrawTexturedRectUV(0, 0, bw, bh, 0.1, 0.3, 0.9, 0.7)
+			surface.SetMaterial(UI.Mat("scpsite/ui/fade_h.png"))
+			surface.SetDrawColor(8, 9, 11, 245)
+			surface.DrawTexturedRect(0, 0, bw * 0.9, bh)
+			surface.SetDrawColor(255, 255, 255, 18 + 50 * s.hover + 120 * s.sel)
+			surface.DrawOutlinedRect(0, 0, bw, bh, 1)
+			surface.SetDrawColor(fac.color)
+			surface.DrawRect(0, 0, UI.S(3), bh)
+			draw.SimpleText(ch.roman, SCP.Font("title", 40), UI.S(22), bh / 2, UI.Alpha(UI.Col.text, 120 + 135 * s.sel), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			draw.SimpleText(ch.title, SCP.Font("titlemed", 22), UI.S(82), bh / 2 - UI.S(12), UI.Col.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			draw.SimpleText(string.upper(fac.short) .. " · " .. #ch.stages .. " ЭТАПОВ", SCP.Font("mono", 11), UI.S(83), bh / 2 + UI.S(14), fac.color, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			if LocalPlayer():GetNW2Int("scp.done." .. i, 0) == 1 then
+				UI.DrawIcon("check", bw - UI.S(22), UI.S(20), UI.S(16), UI.Col.green)
+			end
+			if on then UI.DrawIcon("chevron_right", bw - UI.S(22), bh / 2, UI.S(18), UI.Col.text) end
+			return true
+		end
+		b:SetTooltip(ch.desc)
+	end
+	return list
 end

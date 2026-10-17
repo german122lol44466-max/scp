@@ -20,6 +20,11 @@ end
 
 function ENT:Think()
 	if self:GetDone() then return end
+	if self:GetBlocked() then
+		if self.Loop then self.Loop:Stop() self.Loop = nil end
+		self:NextThink(CurTime() + 0.2)
+		return true
+	end
 	local users = 0
 	for _, p in ipairs(player.GetAll()) do
 		if p:InGame() and p:Alive() and p:KeyDown(IN_USE) and looking(p, self) then

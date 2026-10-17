@@ -62,6 +62,7 @@ ICONS = {
     "minus": "minus", "crosshair": "crosshair", "skull": "skull", "eye": "eye", "info": "info-circle",
     "check": "check", "close": "x", "arrow_right": "arrow-right", "arrow_left": "arrow-left",
     "chevron_right": "chevron-right", "chevron_left": "chevron-left", "item": "package",
+    "run": "run", "lock": "lock", "bolt": "bolt", "flask": "flask", "settings": "settings",
 }
 
 
@@ -194,6 +195,9 @@ def build_update_images(scpcb, logo):
 
     cover(os.path.join(scpcb, "Loadingscreens", "096.png"), "096")
     cover(os.path.join(scpcb, "Loadingscreens", "mtf.jpg"), "mtf")
+    cover(os.path.join(scpcb, "Loadingscreens", "173.jpg"), "173")
+    cover(os.path.join(scpcb, "Loadingscreens", "049.jpg"), "049")
+    cover(os.path.join(scpcb, "Loadingscreens", "079.jpg"), "keter")
     # эмблема на тёмном фоне со сканлайнами
     bg = Image.new("RGB", (1024, 512), (14, 15, 18))
     lg = logo.resize((380, 380), Image.LANCZOS)
@@ -246,6 +250,29 @@ SOUNDS = {
     "fx/generator_on.mp3": ("General/GeneratorOn.ogg", [], True),
     "fx/power_down.mp3": ("Room/Blackout.ogg", [], True),
     "fx/lockdown.mp3": ("Door/BigDoorClose.ogg", [], True),
+    "fx/warhead_arm.mp3": ("Ending/GateB/Siren.ogg", ["volume=0.8"], True),
+    "fx/detonation.mp3": ("Ending/GateB/Nuke1.ogg", ["loudnorm=I=-12"], False),
+    "fx/cutscene_hit.mp3": ("Horror/Horror0.ogg", ["volume=0.9"], True),
+    "fx/bandage.mp3": ("Interact/PickItem3.ogg", [], True),
+    "amb/drone.mp3": ("Ambient/Room ambience/lowdrone.ogg", ["loudnorm=I=-24"], True),
+    "amb/vent.mp3": ("Ambient/Room ambience/ventilation.ogg", ["loudnorm=I=-24"], True),
+    "amb/servers.mp3": ("Ambient/Room ambience/servers1.ogg", ["loudnorm=I=-24"], True),
+    "amb/fan.mp3": ("Ambient/Room ambience/Fan.ogg", ["loudnorm=I=-24"], True),
+    "amb/drip.mp3": ("Ambient/Room ambience/drip.ogg", ["loudnorm=I=-24"], True),
+}
+
+# Реплики МОГ Эпсилон-11 (SCP:CB) для круговое меню G: имя в игре -> файлы
+MTF = {
+    "stop": [f"Stop{i}.ogg" for i in range(1, 7)],
+    "thereheis": [f"ThereHeIs{i}.ogg" for i in range(1, 7)],
+    "blinking": ["173/BLINKING.ogg"],
+    "173_spotted": [f"173/Spotted{i}.ogg" for i in range(1, 4)],
+    "096_spotted": [f"096/Spotted{i}.ogg" for i in range(1, 3)],
+    "049_spotted": [f"049/Spotted{i}.ogg" for i in range(1, 6)],
+    "searching": [f"Searching{i}.ogg" for i in range(1, 7)],
+    "targetlost": [f"TargetLost{i}.ogg" for i in range(1, 4)],
+    "terminated": ["Targetterminated1.ogg"] + [f"TargetTerminated{i}.ogg" for i in range(2, 5)],
+    "contained": [f"173/Cont{i}.ogg" for i in range(1, 5)],
 }
 
 
@@ -257,6 +284,13 @@ def build_sounds(scpcb, nyrp_ui):
         ff(os.path.join(sfx, "Horror", f"Horror{i}.ogg"), out("sound", "scpsite", "fx", f"horror{i}.mp3"), "volume=0.8")
     for i in range(5):
         ff(os.path.join(sfx, "Character", "D9341", f"breath{i}.ogg"), out("sound", "scpsite", "breath", f"breath{i}.mp3"), "loudnorm=I=-22")
+    for name, files in MTF.items():
+        for i, f in enumerate(files, 1):
+            dst = out("sound", "scpsite", "mtf", name + (str(i) if len(files) > 1 else "") + ".mp3")
+            ff(os.path.join(sfx, "Character", "MTF", f), dst, "loudnorm=I=-14")
+    for z, n in ((1, 11), (2, 11), (3, 12)):
+        for i in range(1, n + 1):
+            ff(os.path.join(sfx, "Ambient", f"Zone{z}", f"Ambient{i}.ogg"), out("sound", "scpsite", "amb", f"zone{z}_{i}.mp3"), "loudnorm=I=-22")
     # тревога: склеиваем сирену в петлю ~11 с, wav с точкой зацикливания
     alarm = out("sound", "scpsite", "fx", "alarm_loop.wav")
     src = os.path.join(sfx, "Alarm", "Alarm2_1.ogg")
@@ -300,11 +334,42 @@ def synth_sounds():
     rng = np.random.default_rng(3)
     hum += 0.03 * rng.standard_normal(len(t))
     write_wav(out("sound", "scpsite", "fx", "terminal_loop.wav"), hum * 0.8, loop=True)
+    # тиканье таймера
+    t = np.arange(int(rate * 0.12)) / rate
+    tick = np.sin(2 * np.pi * 2200 * t) * np.exp(-t * 60) * 0.5 + np.sin(2 * np.pi * 880 * t) * np.exp(-t * 40) * 0.3
+    tmp = out("sound", "scpsite", "fx", "_tick.wav")
+    write_wav(tmp, tick)
+    ff(tmp, out("sound", "scpsite", "fx", "tick.mp3"))
+    os.remove(tmp)
+    # жужжание лампы
+    t = np.arange(int(rate * 0.9)) / rate
+    buzz = np.sign(np.sin(2 * np.pi * 120 * t)) * 0.12 + 0.05 * rng.standard_normal(len(t))
+    buzz *= np.clip(t * 20, 0, 1) * np.clip((0.9 - t) * 8, 0, 1) * (0.6 + 0.4 * (rng.random(len(t)) > 0.02))
+    tmp = out("sound", "scpsite", "amb", "_buzz.wav")
+    write_wav(tmp, buzz)
+    ff(tmp, out("sound", "scpsite", "amb", "buzz.mp3"), "lowpass=f=3000")
+    os.remove(tmp)
 
 
 # ---------------------------------------------------------- озвучка (Piper) --
+# Громкая связь: женский голос, полоса 250–5000 Гц, компрессия, «зал» из двух отражений.
+PA_FILTER = ["highpass=f=240", "lowpass=f=5200", "acompressor=threshold=0.08:ratio=3:attack=5:release=120:makeup=2",
+             "aecho=0.85:0.5:55|140|260:0.28|0.16|0.08", "afade=t=in:d=0.04", "loudnorm=I=-16:TP=-1.5"]
+# Командование по рации: тот же синтез, ниже на ~4 тона (голос «мужской»), узкая полоса, лёгкий перегруз
+CMD_FILTER = ["rubberband=pitch=0.76:tempo=1.0", "highpass=f=380", "lowpass=f=3100",
+              "acompressor=threshold=0.05:ratio=6:makeup=3", "acrusher=bits=10:mix=0.12", "loudnorm=I=-15:TP=-1.5"]
+
+
+def synth(voice, text, raw, length=1.06):
+    spoken = text.replace("…", ".").replace("—", ",").replace("«", "").replace("»", "")
+    subprocess.run([sys.executable, "-m", "piper", "-m", voice, "-f", raw, "--length-scale", str(length),
+                    "--noise-scale", "0.55", "--noise-w-scale", "0.75", "--sentence-silence", "0.4"],
+                   input=spoken.encode(), check=True, capture_output=True)
+
+
 def build_vo(voice):
     import re
+    import zlib
     src = open(os.path.join(ROOT, "gamemodes", "scpsite", "gamemode", "modules", "story", "sh_story.lua"), encoding="utf-8").read()
     block = src[src.index("S.VO = {"):]
     block = block[:block.index("\n}\n")]
@@ -312,16 +377,19 @@ def build_vo(voice):
     tmpdir = out("sound", "scpsite", "vo", "_tmp")
     os.makedirs(tmpdir, exist_ok=True)
     for vid, text in lines.items():
-        spoken = text.replace("…", ".").replace("—", ",")
         raw = os.path.join(tmpdir, vid + ".wav")
-        subprocess.run([sys.executable, "-m", "piper", "-m", voice, "-f", raw, "--length-scale", "1.08",
-                        "--sentence-silence", "0.35"], input=spoken.encode(), check=True, capture_output=True)
-        # громкая связь: полоса 300–3800 Гц, лёгкое эхо коридора, компрессия
-        ff(raw, out("sound", "scpsite", "vo", vid + ".mp3"),
-           "highpass=f=280", "lowpass=f=3900", "acompressor=threshold=0.1:ratio=4:makeup=2",
-           "aecho=0.8:0.55:90|170:0.32|0.18", "loudnorm=I=-16", mono=True, br="96k")
+        synth(voice, text, raw)
+        ff(raw, out("sound", "scpsite", "vo", vid + ".mp3"), *PA_FILTER, mono=True, br="96k")
+    # реплики Командования (диалоги этапов и катсцен): имя файла — CRC32 текста (как util.CRC в GMod)
+    cmd = set(re.findall(r'\{\s*"command",\s*"([^"]+)"\s*\}', src))
+    cmd |= set(re.findall(r'\{\s*[\d.]+,\s*"Командование",\s*"([^"]+)"\s*\}', src))
+    for text in sorted(cmd):
+        crc = zlib.crc32(text.encode("utf-8")) & 0xFFFFFFFF
+        raw = os.path.join(tmpdir, f"cmd_{crc}.wav")
+        synth(voice, text, raw, length=1.0)
+        ff(raw, out("sound", "scpsite", "vo", f"cmd_{crc}.mp3"), *CMD_FILTER, mono=True, br="80k")
     shutil.rmtree(tmpdir)
-    print("озвучка:", len(lines))
+    print("озвучка: оповещений", len(lines), "· реплик Командования", len(cmd))
 
 
 if __name__ == "__main__":

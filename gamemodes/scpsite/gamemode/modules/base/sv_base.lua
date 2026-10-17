@@ -12,7 +12,11 @@ function GM:PlayerInitialSpawn(ply)
 	ply:SetNW2String("scp.state", "menu")
 	local d = SCP.Data.Of(ply)
 	if d.name then ply:SetNW2String("scp.name", d.name) end
-	ply:SetNW2Int("scp.model", d.model or math.random(#SCP.Config.Models))
+	for fid, fac in pairs(SCP.Config.Factions) do
+		local saved = d.models and d.models[fid]
+		ply:SetNW2Int("scp.model." .. fid, saved or math.random(#fac.models))
+	end
+	ply:SetNW2String("scp.faction", "security")
 	ply:SetTeam(TEAM_UNASSIGNED)
 end
 
@@ -50,7 +54,8 @@ function GM:PlayerSpawn(ply, transition)
 	ply:SetupHands()
 	ply:SetHealth(100)
 	ply:SetMaxHealth(100)
-	ply:SetArmor(state == "playing" and 50 or 0)
+	local _, _, fac = SCP.Lobby.ModelOf(ply)
+	ply:SetArmor(state == "playing" and (fac.armor or 0) or 0)
 	SCP.ApplyMovement(ply)
 	ply:SetNW2Float("scp.stamina", SCP.Config.Stamina.Max)
 	ply:SetNW2Bool("scp.dead", false)
@@ -72,14 +77,14 @@ function GM:PlayerSetModel(ply)
 	util.PrecacheModel(mdl)
 	ply:SetModel(mdl)
 	ply:SetPlayerColor(Vector(0.25, 0.27, 0.3))
-	SCP.Data.Set(ply, "model", ply:GetNW2Int("scp.model", 1))
 end
 
 function GM:PlayerLoadout(ply)
 	if not ply:InGame() then return true end
 	ply:StripWeapons()
 	ply:StripAmmo()
-	for _, cls in ipairs(SCP.Config.Weapons) do
+	local _, _, fac = SCP.Lobby.ModelOf(ply)
+	for _, cls in ipairs(fac.weapons) do
 		local w = ply:Give(cls)
 		if IsValid(w) then
 			local clip = w:GetMaxClip1() > 0 and w:GetMaxClip1() or 50
@@ -88,7 +93,7 @@ function GM:PlayerLoadout(ply)
 			print("[SCP] Нет оружия " .. cls .. " — установите аддон TFA с ним на сервер.")
 		end
 	end
-	if #SCP.Config.Weapons > 0 then ply:SelectWeapon(SCP.Config.Weapons[1]) end
+	if #fac.weapons > 0 then ply:SelectWeapon(fac.weapons[1]) end
 	return true
 end
 

@@ -5,12 +5,20 @@
 local UI = SCP.UI
 local M = SCP.Menu
 
+local soloChapter = 1
+
+local function startSolo()
+	net.Start("scp.menu.solo")
+	net.WriteUInt(soloChapter, 4)
+	net.SendToServer()
+	M.CloseAll()
+end
+
 local function confirmSolo()
 	local others = player.GetCount() - 1
 	local kick = GetConVar("scp_solo_kick") and GetConVar("scp_solo_kick"):GetBool()
 	if others <= 0 or not kick then
-		net.Start("scp.menu.solo") net.SendToServer()
-		M.CloseAll()
+		startSolo()
 		return
 	end
 	local bg, body = SCP.Modal("Одиночная игра", 520, 250, "user")
@@ -31,10 +39,41 @@ local function confirmSolo()
 	yes:SetPrimary(true)
 	yes:SetLabel("Начать одному")
 	yes.DoClick = function()
-		net.Start("scp.menu.solo") net.SendToServer()
 		bg:Remove()
-		M.CloseAll()
+		startSolo()
 	end
+end
+
+-- Одиночная игра: сначала выбор главы
+local function pickChapter()
+	local bg, body, f = SCP.Modal("Одиночная игра — выбор главы", 760, 640, "user")
+	local ch = SCP.Story.Chapters
+	soloChapter = math.Clamp(soloChapter, 1, #ch)
+	local desc = vgui.Create("DPanel", body)
+	desc:SetPos(UI.S(360), 0)
+	desc:SetSize(body:GetWide() - UI.S(360), body:GetTall() - UI.S(60))
+	desc.Paint = function(_, w)
+		local c = ch[soloChapter]
+		local fac = SCP.Config.Factions[c.faction]
+		draw.SimpleText("ГЛАВА " .. c.roman, SCP.Font("monobold", 12), 0, UI.S(10), UI.Col.red)
+		draw.SimpleText(c.title, SCP.Font("title", 34), 0, UI.S(28), UI.Col.text)
+		draw.SimpleText(string.upper(fac.name), SCP.Font("mono", 11), 0, UI.S(76), fac.color)
+		for li, l in ipairs(UI.Wrap(c.desc, SCP.Font("regular", 15), w)) do
+			draw.SimpleText(l, SCP.Font("regular", 15), 0, UI.S(104) + (li - 1) * UI.S(22), UI.Col.dim)
+		end
+		for k, st in ipairs(c.stages) do
+			draw.SimpleText(k .. ". " .. st.title, SCP.Font("medium", 14), 0, UI.S(220) + (k - 1) * UI.S(26), UI.Col.text)
+		end
+	end
+	M.ChapterList(body, 0, -UI.S(10), UI.S(330), function() return soloChapter end, function(i) soloChapter = i end)
+	local go = vgui.Create("SCP.Button", body)
+	go:SetSize(UI.S(260), UI.S(48))
+	go:SetPos(body:GetWide() - UI.S(260), body:GetTall() - UI.S(48))
+	go:SetPrimary(true)
+	go:SetFontStyle("title", 20)
+	go:SetLabel("НАЧАТЬ")
+	go:SetIcon("play")
+	go.DoClick = function() bg:Remove() confirmSolo() end
 end
 
 local function card(parent, d, i)
@@ -97,7 +136,7 @@ function M.BuildSelect()
 		surface.SetAlphaMultiplier(a)
 		UI.Logo(w / 2, UI.S(96), UI.S(52), 230)
 		draw.SimpleText("ВЫБЕРИТЕ РЕЖИМ", SCP.Font("title", 34), w / 2, UI.S(160), UI.Col.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		draw.SimpleText("ПРОТОКОЛ «СКРОМНИК» · ГЛАВА I", SCP.Font("mono", 13), w / 2, UI.S(194), UI.Col.dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("СЮЖЕТНАЯ КАМПАНИЯ · " .. #SCP.Story.Chapters .. " ГЛАВ · ОХРАНА И МОГ ЭПСИЛОН-11", SCP.Font("mono", 13), w / 2, UI.S(194), UI.Col.dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		surface.SetAlphaMultiplier(1)
 	end
 
@@ -107,7 +146,7 @@ function M.BuildSelect()
 	local defs = {
 		{ tag = "ОДИН ОПЕРАТИВНИК", title = "ОДИНОЧНАЯ ИГРА", icon = "user", image = "096",
 			desc = "Сюжет в одиночку. Тишина, пустые коридоры и он. Остальные игроки будут отключены от сервера.",
-			click = confirmSolo },
+			click = pickChapter },
 		{ tag = "ОТРЯД ДО " .. SCP.Config.LobbyMax .. " ЧЕЛОВЕК", title = "МУЛЬТИПЛЕЕР", icon = "users", image = "mtf",
 			desc = "Соберите отряд: выберите оперативника, пригласите игроков с сервера и общайтесь голосом прямо в лобби.",
 			click = function() net.Start("scp.menu.multi") net.SendToServer() end },

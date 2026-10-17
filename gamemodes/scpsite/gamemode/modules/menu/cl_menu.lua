@@ -122,6 +122,51 @@ end)
 CreateClientConVar("scp_music", "1", true, false, "Громкость музыки меню (0..1)", 0, 1)
 
 -- ---------------------------------------------------- общий фон экранов --
+-- Живой слой: частицы пыли, полоса сканирования, огромная эмблема справа
+local motes
+local function ambient(w, h)
+	if not motes then
+		motes = {}
+		for i = 1, 70 do
+			motes[i] = { x = math.random(), y = math.random(), s = math.Rand(1, 3), v = math.Rand(0.004, 0.02), a = math.Rand(30, 110), ph = math.Rand(0, 6) }
+		end
+	end
+	local t = RealTime()
+	-- эмблема
+	local size = h * 1.15
+	surface.SetMaterial(UI.Mat("scpsite/logo.png"))
+	surface.SetDrawColor(255, 255, 255, 9)
+	surface.DrawTexturedRectRotated(w * 0.78, h * 0.55, size, size, t * 2.5)
+	surface.SetDrawColor(255, 255, 255, 5)
+	surface.DrawTexturedRectRotated(w * 0.78, h * 0.55, size * 0.62, size * 0.62, -t * 4)
+	-- частицы
+	for _, m in ipairs(motes) do
+		local y = (m.y - t * m.v) % 1
+		local x = m.x + math.sin(t * 0.3 + m.ph) * 0.01
+		UI.Circle(x * w, y * h, UI.S(m.s), Color(230, 228, 220, m.a * (0.6 + 0.4 * math.sin(t + m.ph))))
+	end
+	-- полоса сканирования
+	local sy = (t * 0.08 % 1.2 - 0.1) * h
+	surface.SetMaterial(UI.Mat("scpsite/ui/fade_v.png"))
+	surface.SetDrawColor(255, 255, 255, 10)
+	surface.DrawTexturedRect(0, sy - UI.S(120), w, UI.S(120))
+	surface.SetDrawColor(255, 255, 255, 22)
+	surface.DrawRect(0, sy, w, 1)
+end
+M.Ambient = ambient
+
+-- Заголовок с редкими глитчами (смещённые красная и голубая копии)
+function M.GlitchText(text, font, x, y, col, ax, ay)
+	local t = RealTime()
+	local g = (math.sin(t * 1.7) > 0.985 or math.sin(t * 0.63 + 1) > 0.992) and 1 or 0
+	if g > 0 then
+		local o = UI.S(math.random(2, 5))
+		draw.SimpleText(text, font, x - o, y, Color(255, 40, 40, 150), ax, ay)
+		draw.SimpleText(text, font, x + o, y + UI.S(1), Color(40, 220, 255, 150), ax, ay)
+	end
+	draw.SimpleText(text, font, x, y, col, ax, ay)
+end
+
 function M.PaintBackdrop(w, h, darkLeft)
 	-- затемнение слева (под кнопки) и снизу
 	surface.SetMaterial(UI.Mat("scpsite/ui/fade_h.png"))
@@ -132,9 +177,12 @@ function M.PaintBackdrop(w, h, darkLeft)
 	surface.DrawTexturedRect(0, h * 0.55, w, h * 0.45)
 	surface.SetDrawColor(0, 0, 0, 200)
 	surface.DrawTexturedRectUV(0, 0, w, h * 0.25, 0, 1, 1, 0)
+	ambient(w, h)
 	UI.Vignette(0, 0, w, h, 255)
 	UI.Scanlines(0, 0, w, h, 22)
 	UI.Grain(0, 0, w, h, 10)
+	-- рамка-уголки по краям экрана
+	UI.Corners(UI.S(20), UI.S(20), w - UI.S(40), h - UI.S(40), UI.S(28), Color(255, 255, 255, 40), 1)
 end
 
 -- Мигающий курсор терминала

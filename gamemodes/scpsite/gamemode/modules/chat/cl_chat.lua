@@ -15,7 +15,7 @@ function CH.Add(msg)
 	msg.kind = msg.kind or "system"
 	CH.Lines[#CH.Lines + 1] = msg
 	if #CH.Lines > MAX then table.remove(CH.Lines, 1) end
-	if msg.kind ~= "system" then
+	if msg.kind ~= "system" and not msg.nolog then
 		local k = CH.Kinds[msg.kind]
 		MsgC(k and k.col or color_white, (k and k.label and ("[" .. k.label .. "] ") or ""), msg.name and (msg.name .. ": ") or "", color_white, msg.text, "\n")
 	end
@@ -28,22 +28,20 @@ net.Receive("scp.chat.msg", function()
 	if kind ~= "system" then chat.PlaySound() end
 end)
 
--- Сообщения других аддонов и движка (chat.AddText) тоже показываем
+-- Сообщения других аддонов (chat.AddText) в чат режима не попадают — только в консоль
 CH.OrigAddText = CH.OrigAddText or chat.AddText
 function chat.AddText(...)
 	local parts = {}
 	for _, v in ipairs({ ... }) do
 		if isstring(v) then parts[#parts + 1] = v
-		elseif type(v) == "Player" and IsValid(v) then parts[#parts + 1] = v:SCPName() end
+		elseif type(v) == "Player" and IsValid(v) then parts[#parts + 1] = v:Nick() end
 	end
-	CH.Add({ kind = "system", text = table.concat(parts) })
-	return CH.OrigAddText(...)
+	MsgC(Color(150, 150, 150), "[чат аддона] ", table.concat(parts), "\n")
 end
 
+-- Системные сообщения движка: оставляем только вход/выход игроков
 hook.Add("ChatText", "scp.chat", function(index, name, text, kind)
-	if kind == "joinleave" or kind == "none" or kind == "servermsg" then
-		CH.Add({ kind = "system", text = text })
-	end
+	if kind == "joinleave" then CH.Add({ kind = "system", text = text }) end
 	return true
 end)
 
@@ -135,6 +133,7 @@ function CH.Open(team)
 	local st = SCP.MyState()
 	local f = vgui.Create("DPanel")
 	CH.Box = f
+	f.SCPCloseOnEsc = function() if CH.CloseBox then CH.CloseBox() end end
 	f:SetSize(UI.S(W) + UI.S(24), UI.S(360))
 	f:SetPos(UI.S(20), chatY() - UI.S(360) + UI.S(62))
 	f:MakePopup()
@@ -168,12 +167,13 @@ function CH.Open(team)
 		timer.Simple(0, function() if IsValid(hist) then hist:GetVBar():AnimateTo(total, 0.1) end end)
 	end
 	relayout()
-	f.Think = function(s) if s.dirty then s.dirty = false relayout() end end
 
 	local entry = vgui.Create("SCP.Entry", f)
 	entry:SetPos(UI.S(12), f:GetTall() - UI.S(48))
 	entry:SetSize(f:GetWide() - UI.S(24), UI.S(38))
+	f:SetKeyboardInputEnabled(true)
 	entry:RequestFocus()
+	timer.Simple(0, function() if IsValid(entry) then entry:RequestFocus() end end)
 	if team and st == "playing" then entry:SetValue("/r ") entry:SetCaretPos(3) end
 	entry.PaintOver = function(s, w, h)
 		local kind = CH.Parse(s:GetValue())
@@ -187,6 +187,13 @@ function CH.Open(team)
 	local function close()
 		typing(false)
 		if IsValid(f) then f:Remove() end
+		CH.CloseBox = nil
+	end
+	CH.CloseBox = close
+	-- клик мимо окна чата — закрыть
+	f.Think = function(s)
+		if s.dirty then s.dirty = false relayout() end
+		if input.IsMouseDown(MOUSE_LEFT) and not s:IsChildHovered() and not s:IsHovered() and RealTime() - s.Born > 0.2 then close() end
 	end
 	entry.OnEnter = function(s)
 		local text = string.Trim(s:GetValue())
@@ -208,6 +215,12 @@ hook.Add("PlayerBindPress", "scp.chat", function(ply, bind, pressed)
 	if not pressed then return end
 	if bind == "messagemode" then CH.Open(false) return true end
 	if bind == "messagemode2" then CH.Open(true) return true end
+end)
+
+-- Если стандартный чат всё же пытается открыться (другой аддон перехватил бинд) — открываем свой
+hook.Add("StartChat", "scp.chat", function(team)
+	CH.Open(team)
+	return true
 end)
 
 -- «печатает…» над головой

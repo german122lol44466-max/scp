@@ -106,7 +106,7 @@ function M.BuildMain()
 		local pulse = 0.92 + math.sin(RealTime() * 1.3) * 0.08
 		UI.Logo(colX + UI.S(56), cy - UI.S(60), UI.S(112), 255 * a, true)
 		surface.SetAlphaMultiplier(a)
-		draw.SimpleText("SCP", SCP.Font("title", 82), colX + UI.S(132), cy - UI.S(84), UI.Col.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		M.GlitchText("SCP", SCP.Font("title", 82), colX + UI.S(132), cy - UI.S(84), UI.Col.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		draw.SimpleText("ОБЪЕКТ-19", SCP.Font("titlelight", 30), colX + UI.S(136), cy - UI.S(28), UI.Alpha(UI.Col.text, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		draw.SimpleText("ОБЕЗОПАСИТЬ · УДЕРЖАТЬ · СОХРАНИТЬ", SCP.Font("mono", 13), colX + UI.S(2), cy + UI.S(22),
 			UI.Alpha(UI.Col.dim, 220 * pulse), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
@@ -114,6 +114,17 @@ function M.BuildMain()
 		surface.DrawRect(colX, cy + UI.S(42), UI.S(360), 1)
 		surface.SetDrawColor(UI.Col.red)
 		surface.DrawRect(colX, cy + UI.S(42), UI.S(36), 1)
+
+		-- прогресс кампании
+		local done = 0
+		for i = 1, #SCP.Story.Chapters do if LocalPlayer():GetNW2Int("scp.done." .. i, 0) == 1 then done = done + 1 end end
+		local py = h * 0.5 + UI.S(110)
+		draw.SimpleText("КАМПАНИЯ  " .. done .. " / " .. #SCP.Story.Chapters, SCP.Font("monobold", 11), colX, py, UI.Col.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		for i = 1, #SCP.Story.Chapters do
+			local on = LocalPlayer():GetNW2Int("scp.done." .. i, 0) == 1
+			surface.SetDrawColor(on and UI.Col.red or Color(255, 255, 255, 30))
+			surface.DrawRect(colX + UI.S(130) + (i - 1) * UI.S(34), py - UI.S(2), UI.S(28), UI.S(4))
+		end
 
 		-- терминальная строка
 		local line = ticker[math.floor(RealTime() / 6) % #ticker + 1]
@@ -134,7 +145,7 @@ function M.BuildMain()
 
 	-- кнопки
 	local btns = {
-		{ "ИГРАТЬ", "СЮЖЕТНАЯ КАМПАНИЯ · ГЛАВА I", function() M.Go("select") end },
+		{ "ИГРАТЬ", "СЮЖЕТНАЯ КАМПАНИЯ · " .. #SCP.Story.Chapters .. " ГЛАВ", function() M.Go("select") end },
 		{ "ОТКЛЮЧИТЬСЯ", "ПОКИНУТЬ СЕРВЕР", function()
 			local _, body = SCP.Modal("Отключиться?", 460, 220, "logout")
 			local txt = vgui.Create("DLabel", body)
@@ -162,6 +173,7 @@ function M.BuildMain()
 		b:SetPos(colX - UI.S(18), y)
 		b:SetSize(UI.S(440), UI.S(76))
 		b:SetLabel(d[1], d[2])
+		b.Index = i
 		b.Delay = 0.25 + i * 0.1
 		b.DoClick = d[3]
 		y = y + UI.S(84)

@@ -43,13 +43,16 @@ function GM:AddHint() end
 function GM:SuppressHint() return true end
 
 -- Q: инвентарь (в редакторе — обычное спавн-меню)
+-- Q: короткое нажатие — личное дело, удержание — выглядывание влево (modules/lean)
 function GM:OnSpawnMenuOpen()
 	if SCP.MyState() == "edit" then return self.BaseClass.OnSpawnMenuOpen(self) end
-	if SCP.MyState() == "playing" and LocalPlayer():Alive() then SCP.Inv.Toggle() end
+	if IsValid(SCP.Inv.Panel) then SCP.Inv.Close() return end
+	SCP.Camera.QPressed()
 end
 
 function GM:OnSpawnMenuClose()
 	if SCP.MyState() == "edit" then return self.BaseClass.OnSpawnMenuClose(self) end
+	if SCP.Camera.QReleased() and SCP.MyState() == "playing" and LocalPlayer():Alive() then SCP.Inv.Open() end
 end
 
 function GM:OnContextMenuOpen()

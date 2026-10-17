@@ -15,5 +15,10 @@ end
 
 ENT.SCPPrompt = function(self)
 	if self:GetDone() then return nil end
+	if self:GetBlocked() then
+		local st = SCP.Story.Current()
+		local need = st and st.needItem and SCP.Items.Defs[st.needItem]
+		return "Нужно: " .. (need and need.name or "предмет"), nil, true
+	end
 	return "Удерживайте — " .. self:GetLabel(), self:GetProgress()
 end

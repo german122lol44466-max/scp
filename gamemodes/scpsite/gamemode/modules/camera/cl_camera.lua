@@ -104,6 +104,7 @@ function GM:CalcView(ply, origin, angles, fov, znear, zfar)
 	view.fov = view.fov + fovAdd
 
 	view.origin, view.angles = pos, ang
+	Cam.ApplyLean(view, ply)
 	return view
 end
 

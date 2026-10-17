@@ -49,6 +49,9 @@ alias = {}
 for f, s in code.items():
     for m in re.finditer(r'local\s+(\w+)\s*=\s*SCP\.(\w+)\b(?!\.)', s):
         alias[(f, m.group(1))] = m.group(2)
+    # local M = {} … SCP.X = M
+    for m in re.finditer(r'^SCP\.(\w+)\s*=\s*(\w+)\s*$', s, flags=re.M):
+        alias[(f, m.group(2))] = m.group(1)
 defined = set()
 for f, s in code.items():
     for m in re.finditer(r'function\s+SCP\.(\w+)[.:](\w+)\s*\(', s):

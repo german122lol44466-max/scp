@@ -15,6 +15,9 @@ local statRows = {
 	{ "deaths", "Гибелей" },
 	{ "saw_096", "Видел лицо SCP-096" },
 	{ "killed_by_096", "Убит SCP-096" },
+	{ "killed_by_173", "Убит SCP-173" },
+	{ "killed_by_049", "Убит SCP-049" },
+	{ "healed", "Перевязано товарищей" },
 	{ "notes", "Найдено документов" },
 	{ "teamkills", "Огонь по своим" },
 	{ "distance", "Пройдено", function(v) return math.Round(v) .. " м" end },
@@ -60,7 +63,8 @@ function Inv.Open()
 		-- шапка
 		UI.Logo(px + UI.S(24), py - UI.S(34), UI.S(40), 235)
 		draw.SimpleText("ЛИЧНОЕ ДЕЛО", SCP.Font("title", 30), px + UI.S(56), py - UI.S(44), UI.Col.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-		draw.SimpleText("ФОНД SCP · ОБЪЕКТ-19 · СЛУЖБА БЕЗОПАСНОСТИ", SCP.Font("mono", 12), px + UI.S(57), py - UI.S(16), UI.Col.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		local _, _, fac = SCP.Lobby.ModelOf(LocalPlayer())
+		draw.SimpleText("ФОНД SCP · ОБЪЕКТ-19 · " .. string.upper(fac.name), SCP.Font("mono", 12), px + UI.S(57), py - UI.S(16), UI.Col.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		draw.SimpleText("[Q] ЗАКРЫТЬ", SCP.Font("monobold", 12), px + pw, py - UI.S(30), UI.Col.dim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 		surface.SetAlphaMultiplier(1)
 	end
@@ -111,9 +115,9 @@ function Inv.Open()
 	info:SetSize(left:GetWide() - UI.S(40), UI.S(190))
 	info.Paint = function(_, w)
 		local me = LocalPlayer()
-		local _, idx = SCP.Lobby.ModelOf(me)
+		local _, idx, fac = SCP.Lobby.ModelOf(me)
 		draw.SimpleText(me:SCPName(), SCP.Font("title", 26), 0, 0, UI.Col.text)
-		draw.SimpleText(string.upper(C.ModelNames[idx] or "") .. " · ДОПУСК 2", SCP.Font("mono", 12), 0, UI.S(36), UI.Col.dim)
+		draw.SimpleText(string.upper(fac.modelNames[idx] or "") .. " · ДОПУСК " .. (fac.clearance or 2), SCP.Font("mono", 12), 0, UI.S(36), fac.color)
 		local rows = {
 			{ "ЗДОРОВЬЕ", me:Health() / me:GetMaxHealth(), me:Health() < 35 and UI.Col.red or UI.Col.text, me:Health() },
 			{ "БРОНЯ", me:Armor() / 100, Color(140, 170, 210), me:Armor() },
@@ -194,7 +198,7 @@ function Inv.Open()
 	hint:SetSize(mid:GetWide() - UI.S(40), UI.S(20))
 	hint:SetFont(SCP.Font("mono", 11))
 	hint:SetTextColor(UI.Col.faint)
-	hint:SetText("ЛКМ / ПКМ — ДЕЙСТВИЯ · Z — КОМАНДЫ ОТРЯДУ · B — РАЦИЯ")
+	hint:SetText("ЛКМ / ПКМ — ДЕЙСТВИЯ · Z — КОМАНДЫ · G — ФОНД · B — РАЦИЯ")
 
 	-- ----------------------------------------------------- статистика --
 	local right = card(UI.S(1032), UI.S(408), "СЛУЖБА")
@@ -218,12 +222,12 @@ function Inv.Open()
 	stats.Paint = function(_, w)
 		local mine = SCP.Stats.Mine or {}
 		for i, r in ipairs(statRows) do
-			local y = (i - 1) * UI.S(50)
+			local y = (i - 1) * UI.S(38)
 			local v = mine[r[1]] or 0
-			draw.SimpleText(r[2], SCP.Font("regular", 15), 0, y + UI.S(16), UI.Col.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-			draw.SimpleText(r[3] and r[3](v) or tostring(math.Round(v)), SCP.Font("titlemed", 20), w, y + UI.S(16), UI.Col.text, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+			draw.SimpleText(r[2], SCP.Font("regular", 14), 0, y + UI.S(14), UI.Col.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			draw.SimpleText(r[3] and r[3](v) or tostring(math.Round(v)), SCP.Font("titlemed", 18), w, y + UI.S(14), UI.Col.text, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 			surface.SetDrawColor(255, 255, 255, 10)
-			surface.DrawRect(0, y + UI.S(38), w, 1)
+			surface.DrawRect(0, y + UI.S(31), w, 1)
 		end
 	end
 end

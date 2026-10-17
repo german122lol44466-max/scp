@@ -99,7 +99,9 @@ function Ed.Open()
 			{ "minus", "Удалить ближайшую", function() send(t.id, "remove") end },
 			{ "trash", "Удалить все", function() send(t.id, "clear") end },
 		}
-		if t.cam then
+		if t.cutscene then
+			btns[#btns + 1] = { "play", "Проиграть катсцену", function() Ed.Close() SCP.Cutscene.Play(t.cutscene, true) end }
+		elseif t.cam then
 			btns[#btns + 1] = { "eye", "Посмотреть", function() Ed.Preview(t.id) end }
 		else
 			btns[#btns + 1] = { "map_pin", "Телепорт к первой", function() send(t.id, "tp") end }
@@ -138,11 +140,14 @@ hook.Add("PostDrawTranslucentRenderables", "scp.editor", function(depth, sky)
 	if sky or not SCP.InEdit(LocalPlayer()) then return end
 	render.SetColorMaterial()
 	for _, t in ipairs(P.Types) do
-		for _, p in ipairs(P.Get(t.id)) do
+		for idx, p in ipairs(P.Get(t.id)) do
 			local c = t.col
 			if t.cam then
 				render.DrawWireframeBox(p.pos, p.ang, Vector(-6, -8, -5), Vector(8, 8, 5), c, true)
 				render.DrawLine(p.pos, p.pos + p.ang:Forward() * 60, c, true)
+				local list = P.Get(t.id)
+				local nxt = t.cutscene and list[idx + 1]
+				if nxt then render.DrawLine(p.pos, nxt.pos, Color(c.r, c.g, c.b, 120), true) end
 			else
 				render.DrawSphere(p.pos + Vector(0, 0, 4), 6, 12, 12, Color(c.r, c.g, c.b, 120))
 				render.DrawLine(p.pos, p.pos + Vector(0, 0, 72), Color(c.r, c.g, c.b, 160), true)
@@ -175,9 +180,15 @@ hook.Add("HUDPaint", "scp.editor", function()
 	draw.SimpleTextOutlined("РЕДАКТОР · зажмите C — панель точек · scp_edit — выход", SCP.Font("monobold", 15), x, y, UI.Col.amber, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, color_black)
 	local miss = P.Missing()
 	if #miss > 0 then
-		local names = {}
-		for _, t in ipairs(miss) do names[#names + 1] = t.name end
-		draw.SimpleTextOutlined("Не хватает для сюжета: " .. table.concat(names, ", "), SCP.Font("medium", 14), x, y + UI.S(22), UI.Col.dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, color_black)
+		-- по главам: сколько точек не хватает
+		local byGroup, order = {}, {}
+		for _, t in ipairs(miss) do
+			if not byGroup[t.group] then byGroup[t.group] = 0 order[#order + 1] = t.group end
+			byGroup[t.group] = byGroup[t.group] + 1
+		end
+		local parts = {}
+		for _, g in ipairs(order) do parts[#parts + 1] = g .. ": " .. byGroup[g] end
+		draw.SimpleTextOutlined("Не хватает точек — " .. table.concat(parts, "  ·  "), SCP.Font("medium", 14), x, y + UI.S(22), UI.Col.dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, color_black)
 	else
 		draw.SimpleTextOutlined("Все точки сюжета расставлены", SCP.Font("medium", 14), x, y + UI.S(22), UI.Col.green, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, color_black)
 	end

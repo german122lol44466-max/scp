@@ -5,7 +5,8 @@
 local PH = SCP.Phrases
 local C = SCP.Config
 
-local function send(ply, text)
+-- Облачко над головой (видно рядом)
+function PH.Bubble(ply, text)
 	local list = {}
 	for _, p in ipairs(player.GetAll()) do
 		if p:InGame() and (p == ply or p:GetPos():DistToSqr(ply:GetPos()) <= PH.Range * PH.Range or not p:Alive()) then
@@ -16,6 +17,18 @@ local function send(ply, text)
 	net.WriteEntity(ply)
 	net.WriteString(text)
 	net.Send(list)
+end
+
+-- Реплика: облачко + окно диалога у тех, кто рядом
+local function send(ply, text)
+	PH.Bubble(ply, text)
+	SCP.Dialog.Send(SCP.Dialog.Near(ply, PH.Range), "player", ply, text)
+end
+PH.SendLine = send
+
+-- Мысли — только самому игроку
+function PH.Think(ply, text)
+	SCP.Dialog.Send(ply, "self", ply, text)
 end
 
 function PH.Say(ply, key, vars)
@@ -93,9 +106,41 @@ timer.Create("scp.phrases.ex", 0.5, 0, function()
 	end
 end)
 
+-- Разговоры в тишине: изредка кто-то из отряда что-то говорит
+timer.Create("scp.phrases.idle", 50, 0, function()
+	local alive = {}
+	for _, p in ipairs(player.GetAll()) do if p:InGame() and p:Alive() then alive[#alive + 1] = p end end
+	if #alive == 0 or math.random() > 0.45 then return end
+	local p = alive[math.random(#alive)]
+	local danger = SCP.SCPs.Get("096") or SCP.SCPs.Get("173") or SCP.SCPs.Get("049")
+	if #alive == 1 then
+		PH.Think(p, PH.Lines.alone[math.random(#PH.Lines.alone)])
+	else
+		PH.Say(p, danger and "tense" or "idle")
+	end
+end)
+
+-- SCP рядом (173 / 049): кто-то замечает
+timer.Create("scp.phrases.near", 1, 0, function()
+	for _, key in ipairs({ "173", "049" }) do
+		local e = SCP.SCPs.Get(key)
+		if e then
+			for _, p in ipairs(player.GetAll()) do
+				if p:InGame() and p:Alive() and p:GetPos():DistToSqr(e:GetPos()) < 700 * 700 and (p["scpNear" .. key] or 0) < CurTime() then
+					local tr = util.TraceLine({ start = p:EyePos(), endpos = e:WorldSpaceCenter(), filter = { p, e }, mask = MASK_VISIBLE })
+					if not tr.Hit and p:GetAimVector():Dot((e:WorldSpaceCenter() - p:EyePos()):GetNormalized()) > 0.7 then
+						p["scpNear" .. key] = CurTime() + 30
+						PH.Say(p, "near" .. key)
+					end
+				end
+			end
+		end
+	end
+end)
+
 -- Посмотрел на лицо SCP-096
 timer.Create("scp.phrases.096", 0.3, 0, function()
-	local npc = SCP.Story.NPC096
+	local npc = SCP.SCPs.Get("096")
 	if not IsValid(npc) then return end
 	local head = npc:LookupBone("ValveBiped.Bip01_Head1")
 	local hp = head and npc:GetBonePosition(head) or (npc:EyePos())

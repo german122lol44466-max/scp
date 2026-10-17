@@ -4,20 +4,55 @@
 
 local C = SCP.Config
 
--- Модели охраны (выбор стрелками в лобби)
-C.Models = {
-	"models/arty/codmw2022/sp/mexican federal police/grunts/SCP_OZ_Security_1.mdl",
-	"models/arty/codmw2022/sp/mexican federal police/grunts/SCP_OZ_Security_2.mdl",
-	"models/arty/codmw2022/sp/mexican federal police/grunts/SCP_OZ_Security_3.mdl",
+-- Фракции: модели (выбор стрелками в лобби) и снаряжение. Фракцию задаёт глава.
+C.Factions = {
+	security = {
+		name = "Служба безопасности",
+		short = "СБ",
+		color = Color(150, 160, 175),
+		clearance = 2,
+		models = {
+			"models/arty/codmw2022/sp/mexican federal police/grunts/SCP_OZ_Security_1.mdl",
+			"models/arty/codmw2022/sp/mexican federal police/grunts/SCP_OZ_Security_2.mdl",
+			"models/arty/codmw2022/sp/mexican federal police/grunts/SCP_OZ_Security_3.mdl",
+		},
+		modelNames = { "Оперативник «Альфа»", "Оперативник «Браво»", "Оперативник «Чарли»" },
+		weapons = { "tfa_fml_p90_tac" },
+		armor = 50,
+	},
+	mtf = {
+		name = "МОГ Эпсилон-11 «Девятихвостая лиса»",
+		short = "МОГ",
+		color = Color(96, 140, 210),
+		clearance = 4,
+		models = {
+			"models/scp_mtf_russian/mtf_rus_02.mdl",
+			"models/scp_mtf_russian/mtf_rus_04.mdl",
+			"models/scp_mtf_russian/mtf_rus_05.mdl",
+			"models/scp_mtf_russian/mtf_rus_06.mdl",
+			"models/scp_mtf_russian/mtf_rus_07.mdl",
+			"models/scp_mtf_russian/mtf_rus_08.mdl",
+			"models/scp_mtf_russian/mtf_rus_09.mdl",
+		},
+		modelNames = { "Штурмовик", "Пулемётчик", "Разведчик", "Медик", "Сапёр", "Связист", "Командир звена" },
+		weapons = { "tfa_ins2_ak12", "tfa_ins2_usp_match" },
+		armor = 100,
+	},
 }
-C.ModelNames = { "Оперативник «Альфа»", "Оперативник «Браво»", "Оперативник «Чарли»" }
 
--- Оружие и патроны при выходе на задание
-C.Weapons = { "tfa_fml_p90_tac" }
+-- Совместимость со старым кодом: модели фракции по умолчанию
+C.Models = C.Factions.security.models
+C.ModelNames = C.Factions.security.modelNames
+C.Weapons = C.Factions.security.weapons
 C.SpareMags = 5
 
--- Главный противник
-C.Enemy096 = "npc_shaklin_scp096"
+-- Противники (классы NPC из аддонов). point — точка появления в редакторе.
+C.SCPs = {
+	["096"] = { class = "npc_shaklin_scp096", name = "SCP-096", nick = "Скромник", point = "npc_096", respawn = 25 },
+	["173"] = { class = "npc_scp-173_nextbot", name = "SCP-173", nick = "Скульптура", point = "npc_173", respawn = 20, blink = true },
+	["049"] = { class = "npc_scp_049", name = "SCP-049", nick = "Чумной доктор", point = "npc_049", respawn = 25 },
+}
+C.Enemy096 = C.SCPs["096"].class
 
 -- Передвижение
 C.Movement = {

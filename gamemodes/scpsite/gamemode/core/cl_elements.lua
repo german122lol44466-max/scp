@@ -32,10 +32,16 @@ function MB:Paint(w, h)
 	local off = (1 - appear) * -UI.S(30) + hv * UI.S(14)
 	surface.SetAlphaMultiplier(appear * (self:IsEnabled() and 1 or 0.4))
 
-	-- подсветка строки
+	-- подсветка строки: заливка «въезжает» слева
 	surface.SetMaterial(UI.Mat("scpsite/ui/fade_h.png"))
-	surface.SetDrawColor(255, 255, 255, 22 * hv)
-	surface.DrawTexturedRect(0, 0, w * 0.9, h)
+	surface.SetDrawColor(255, 255, 255, 30 * hv)
+	surface.DrawTexturedRect(0, 0, w * 0.95 * UI.Ease(hv), h)
+	if self.Index then
+		draw.SimpleText(string.format("%02d", self.Index), SCP.Font("mono", 11), w - UI.S(20) - hv * UI.S(10), h / 2,
+			UI.Alpha(UI.Col.dim, 80 + 175 * hv), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+		surface.SetDrawColor(255, 255, 255, 14 + 30 * hv)
+		surface.DrawRect(UI.S(18), h - 1, (w - UI.S(40)) * (0.3 + 0.7 * hv), 1)
+	end
 	-- полоска
 	surface.SetDrawColor(UI.Col.red.r, UI.Col.red.g, UI.Col.red.b, 255 * hv)
 	surface.DrawRect(0, h * (0.5 - hv * 0.32), UI.S(3), h * hv * 0.64)
@@ -161,13 +167,28 @@ function E:Paint(w, h)
 end
 vgui.Register("SCP.Entry", E, "DTextEntry")
 
--- Модальное окно поверх всего: SCP.Modal(title, w, h) -> frame, body
+-- Модальное окно поверх всего: SCP.Modal(title, w, h) -> bg, body, frame
+-- ESC и клик мимо закрывают самое верхнее окно (см. SCP.CloseTopModal, перехват ESC — modules/pause).
+SCP.Modals = SCP.Modals or {}
+
+function SCP.CloseTopModal()
+	for i = #SCP.Modals, 1, -1 do
+		local m = SCP.Modals[i]
+		table.remove(SCP.Modals, i)
+		if IsValid(m) then m:Remove() return true end
+	end
+	return false
+end
+
 function SCP.Modal(title, w, h, icon)
 	local bg = vgui.Create("DPanel")
 	bg:SetSize(ScrW(), ScrH())
 	bg:MakePopup()
+	bg:SetKeyboardInputEnabled(true)
 	bg.Born = RealTime()
 	bg:SetZPos(32000)
+	bg.SCPCloseOnEsc = function(s) s:Remove() end
+	SCP.Modals[#SCP.Modals + 1] = bg
 	bg.Paint = function(s, pw, ph)
 		local t = UI.Ease((RealTime() - s.Born) / 0.25)
 		UI.BlurPanel(s, 4 * t)
@@ -206,4 +227,172 @@ function SCP.Modal(title, w, h, icon)
 	body:SetSize(f:GetWide() - UI.S(48), f:GetTall() - UI.S(94))
 	body.Paint = function() end
 	return bg, body, f
+end
+
+-- ---------------------------------------------------------------- Slider --
+-- :Setup(label, min, max, decimals, get, set) — значение читается get(), пишется set(v)
+local SL = {}
+function SL:Init()
+	self.Label, self.Min, self.Max, self.Dec = "", 0, 1, 2
+	self.hover, self.drag = 0, false
+	self:SetTall(UI.S(54))
+	self:SetCursor("hand")
+end
+function SL:Setup(label, min, max, dec, get, set, fmt)
+	self.Label, self.Min, self.Max, self.Dec, self.Get, self.Set, self.Fmt = label, min, max, dec, get, set, fmt
+end
+function SL:ValueFromX(x)
+	local pad = UI.S(2)
+	local frac = math.Clamp((x - pad) / (self:GetWide() - pad * 2), 0, 1)
+	local v = self.Min + (self.Max - self.Min) * frac
+	return math.Round(v, self.Dec)
+end
+function SL:OnMousePressed() self.drag = true self:MouseCapture(true) self.Set(self:ValueFromX(self:CursorPos())) end
+function SL:OnMouseReleased() self.drag = false self:MouseCapture(false) UI.Sound("click") end
+function SL:Think() if self.drag then self.Set(self:ValueFromX(self:CursorPos())) end end
+function SL:Paint(w, h)
+	self.hover = UI.Approach(self.hover, (self:IsHovered() or self.drag) and 1 or 0, 14)
+	local v = self.Get()
+	local frac = math.Clamp((v - self.Min) / (self.Max - self.Min), 0, 1)
+	draw.SimpleText(self.Label, SCP.Font("medium", 15), 0, UI.S(14), UI.Col.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+	local txt = self.Fmt and self.Fmt(v) or tostring(v)
+	draw.SimpleText(txt, SCP.Font("monobold", 13), w, UI.S(14), UI.Col.dim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+	local y = UI.S(38)
+	surface.SetDrawColor(255, 255, 255, 20)
+	surface.DrawRect(0, y, w, UI.S(3))
+	surface.SetDrawColor(232, 230, 224)
+	surface.DrawRect(0, y, w * frac, UI.S(3))
+	local kx = w * frac
+	UI.Circle(kx, y + UI.S(1.5), UI.S(6 + 2 * self.hover), Color(232, 230, 224))
+	return true
+end
+vgui.Register("SCP.Slider", SL, "DPanel")
+
+-- ---------------------------------------------------------------- Toggle --
+local TG = {}
+function TG:Init() self.Label = "" self.anim = 0 self:SetTall(UI.S(40)) self:SetCursor("hand") self:SetText("") end
+function TG:Setup(label, get, set) self.Label, self.Get, self.Set = label, get, set end
+function TG:DoClick() self.Set(not self.Get()) UI.Sound("toggle") end
+function TG:Paint(w, h)
+	local on = self.Get()
+	self.anim = UI.Approach(self.anim, on and 1 or 0, 14)
+	draw.SimpleText(self.Label, SCP.Font("medium", 15), 0, h / 2, UI.Col.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+	local tw, th = UI.S(40), UI.S(20)
+	local x, y = w - tw, h / 2 - th / 2
+	surface.SetDrawColor(255, 255, 255, 20 + 200 * self.anim)
+	surface.DrawRect(x, y, tw, th)
+	surface.SetDrawColor(on and Color(12, 12, 14) or Color(150, 152, 158))
+	surface.DrawRect(x + UI.S(3) + self.anim * (tw - th), y + UI.S(3), th - UI.S(6), th - UI.S(6))
+	return true
+end
+vgui.Register("SCP.Toggle", TG, "DButton")
+
+-- ---------------------------------------------------------------- Choice --
+-- :Setup(label, { {id, text}, … }, get, set)
+local CHC = {}
+function CHC:Init() self:SetTall(UI.S(64)) self.btns = {} end
+function CHC:Setup(label, opts, get, set)
+	self.Label, self.Get, self.Set = label, get, set
+	for _, o in ipairs(opts) do
+		local b = vgui.Create("DButton", self)
+		b:SetText("")
+		b.hover = 0
+		b.Paint = function(s, w, h)
+			local on = get() == o[1]
+			s.hover = UI.Approach(s.hover, s:IsHovered() and 1 or 0, 14)
+			surface.SetDrawColor(on and 232 or 255, on and 230 or 255, on and 224 or 255, on and 240 or (8 + 18 * s.hover))
+			surface.DrawRect(0, 0, w, h)
+			surface.SetDrawColor(255, 255, 255, on and 0 or 30)
+			surface.DrawOutlinedRect(0, 0, w, h, 1)
+			draw.SimpleText(o[2], SCP.Font("semibold", 13), w / 2, h / 2, on and Color(12, 12, 14) or UI.Col.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			return true
+		end
+		b.DoClick = function() set(o[1]) UI.Sound("toggle") end
+		self.btns[#self.btns + 1] = b
+	end
+end
+function CHC:PerformLayout(w, h)
+	local n = #self.btns
+	local gap = UI.S(6)
+	local bw = (w - gap * (n - 1)) / n
+	for i, b in ipairs(self.btns) do
+		b:SetPos((i - 1) * (bw + gap), UI.S(28))
+		b:SetSize(bw, UI.S(34))
+	end
+end
+function CHC:Paint(w)
+	draw.SimpleText(self.Label, SCP.Font("medium", 15), 0, UI.S(12), UI.Col.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+end
+vgui.Register("SCP.Choice", CHC, "DPanel")
+
+-- Заголовок раздела
+function SCP.Section(parent, text)
+	local p = vgui.Create("DPanel", parent)
+	p:Dock(TOP)
+	p:SetTall(UI.S(40))
+	p:DockMargin(0, UI.S(10), 0, UI.S(2))
+	p.Paint = function(_, w, h)
+		draw.SimpleText(string.upper(text), SCP.Font("monobold", 12), 0, h - UI.S(12), UI.Col.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		surface.SetDrawColor(UI.Col.red)
+		surface.DrawRect(0, h - 1, UI.S(18), 1)
+		surface.SetDrawColor(255, 255, 255, 14)
+		surface.DrawRect(UI.S(22), h - 1, w - UI.S(22), 1)
+	end
+	return p
+end
+
+-- Окно ввода текста: SCP.Prompt(заголовок, подсказка, текущее, ok(текст), [макс. символов])
+-- Enter — сохранить, ESC / «Отмена» / клик мимо — закрыть. Фокус ставится сам.
+function SCP.Prompt(title, hint, value, ok, maxLen)
+	local bg, body = SCP.Modal(title, 520, 250, "pencil")
+	local lbl = vgui.Create("DLabel", body)
+	lbl:Dock(TOP)
+	lbl:SetFont(SCP.Font("regular", 14))
+	lbl:SetTextColor(UI.Col.dim)
+	lbl:SetText(hint or "")
+	lbl:SetTall(UI.S(24))
+	local e = vgui.Create("SCP.Entry", body)
+	e:Dock(TOP)
+	e:DockMargin(0, UI.S(6), 0, 0)
+	e:SetTall(UI.S(44))
+	e:SetFont(SCP.Font("semibold", 20))
+	e:SetValue(value or "")
+	e:SetUpdateOnType(true)
+	if maxLen then
+		e.AllowInput = function(s, ch)
+			return utf8.len(s:GetValue() or "") >= maxLen
+		end
+	end
+	local row = vgui.Create("DPanel", body)
+	row:Dock(BOTTOM)
+	row:SetTall(UI.S(42))
+	row.Paint = function() end
+	local function submit()
+		local v = string.Trim(e:GetValue() or "")
+		bg:Remove()
+		if v ~= "" then ok(v) end
+	end
+	local save = vgui.Create("SCP.Button", row)
+	save:Dock(RIGHT)
+	save:SetWide(UI.S(170))
+	save:SetPrimary(true)
+	save:SetLabel("Сохранить")
+	save:SetIcon("check")
+	save.DoClick = submit
+	local cancel = vgui.Create("SCP.Button", row)
+	cancel:Dock(RIGHT)
+	cancel:DockMargin(0, 0, UI.S(8), 0)
+	cancel:SetWide(UI.S(130))
+	cancel:SetLabel("Отмена")
+	cancel.DoClick = function() bg:Remove() end
+	e.OnEnter = submit
+	-- фокус — со следующего кадра, когда окно уже на экране
+	timer.Simple(0, function()
+		if IsValid(e) then
+			e:RequestFocus()
+			e:SelectAllText(true)
+			e:SetCaretPos(utf8.len(e:GetValue() or "") or 0)
+		end
+	end)
+	return bg, e
 end
